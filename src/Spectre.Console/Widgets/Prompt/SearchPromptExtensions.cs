@@ -24,12 +24,25 @@ namespace Spectre.Console
             prompt.Converter = displaySelector;
             return prompt;
         }
+
+        public static SearchPrompt<T> UseComparer<T>(this SearchPrompt<T> prompt, Func<T, string, bool> comparer)
+            where T : notnull
+        {
+            prompt.Comparer = comparer;
+            return prompt;
+        }
     }
 
     public class SearchPrompt<T> : IPrompt<T>
     {
         private readonly IList<T> _choices = new List<T>();
         public Func<T, string>? Converter { get; set; } = choice => choice?.ToString();
+        public Func<T, string, bool> Comparer { get; set; }
+
+        public SearchPrompt()
+        {
+            Comparer = (choice, input) => Converter(choice).StartsWith(input);
+        }
 
         public void AddChoice(T item)
         {
@@ -45,7 +58,7 @@ namespace Spectre.Console
 
             while (true)
             {
-                var toRender = _choices.Select(Converter).Where(x => x.StartsWith(input)).Take(10).ToArray();
+                var toRender = _choices.Where(x => Comparer(x, input)).Select(Converter).Take(10).ToArray();
 
                 if (key == null || (key.Value.Key != ConsoleKey.DownArrow && key.Value.Key != ConsoleKey.UpArrow))
                 {
@@ -96,7 +109,6 @@ namespace Spectre.Console
 
                 if (key.Value.Key == ConsoleKey.Enter)
                 {
-                    AnsiConsole.Write(toRender.ElementAt(index));
                     break;
                 }
             }
