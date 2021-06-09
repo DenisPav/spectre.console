@@ -100,7 +100,7 @@ namespace Spectre.Console
                 }
             }
 
-            return _choices.ElementAt(index);
+            return _choices.Where(x => Comparer(x, input)).Take(PageSize).ElementAt(index);
         }
     }
     
