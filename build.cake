@@ -4,7 +4,14 @@ var configuration = Argument("configuration", "Release");
 ////////////////////////////////////////////////////////////////
 // Tasks
 
+Task("Clean")
+    .Does(context =>
+{
+    context.CleanDirectory("./.artifacts");
+});
+
 Task("Build")
+    .IsDependentOn("Clean")
     .Does(context => 
 {
     DotNetCoreBuild("./src/Spectre.Console.sln", new DotNetCoreBuildSettings {
@@ -15,11 +22,43 @@ Task("Build")
     });
 });
 
-Task("Test")
+Task("Build-Analyzer")
     .IsDependentOn("Build")
     .Does(context => 
 {
-    DotNetCoreTest("./src/Spectre.Console.Tests/Spectre.Console.Tests.csproj", new DotNetCoreTestSettings {
+    DotNetCoreBuild("./src/Spectre.Console.Analyzer.sln", new DotNetCoreBuildSettings {
+        Configuration = configuration,
+        NoIncremental = context.HasArgument("rebuild"),
+        MSBuildSettings = new DotNetCoreMSBuildSettings()
+            .TreatAllWarningsAs(MSBuildTreatAllWarningsAs.Error)
+    });
+});
+
+Task("Build-Examples")
+    .IsDependentOn("Build")
+    .Does(context => 
+{
+    DotNetCoreBuild("./examples/Examples.sln", new DotNetCoreBuildSettings {
+        Configuration = configuration,
+        NoIncremental = context.HasArgument("rebuild"),
+        MSBuildSettings = new DotNetCoreMSBuildSettings()
+            .TreatAllWarningsAs(MSBuildTreatAllWarningsAs.Error)
+    });
+});
+
+Task("Test")
+    .IsDependentOn("Build")
+    .IsDependentOn("Build-Analyzer")
+    .IsDependentOn("Build-Examples")
+    .Does(context => 
+{
+    DotNetCoreTest("./test/Spectre.Console.Tests/Spectre.Console.Tests.csproj", new DotNetCoreTestSettings {
+        Configuration = configuration,
+        NoRestore = true,
+        NoBuild = true,
+    });
+
+    DotNetCoreTest("./test/Spectre.Console.Analyzer.Tests/Spectre.Console.Analyzer.Tests.csproj", new DotNetCoreTestSettings {
         Configuration = configuration,
         NoRestore = true,
         NoBuild = true,
@@ -30,9 +69,16 @@ Task("Package")
     .IsDependentOn("Test")
     .Does(context => 
 {
-    context.CleanDirectory("./.artifacts");
-
     context.DotNetCorePack($"./src/Spectre.Console.sln", new DotNetCorePackSettings {
+        Configuration = configuration,
+        NoRestore = true,
+        NoBuild = true,
+        OutputDirectory = "./.artifacts",
+        MSBuildSettings = new DotNetCoreMSBuildSettings()
+            .TreatAllWarningsAs(MSBuildTreatAllWarningsAs.Error)
+    });
+
+    context.DotNetCorePack($"./src/Spectre.Console.Analyzer.sln", new DotNetCorePackSettings {
         Configuration = configuration,
         NoRestore = true,
         NoBuild = true,
