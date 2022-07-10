@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Spectre.Console.Rendering;
@@ -28,77 +29,78 @@ namespace Spectre.Console
         {
             var input = string.Empty;
             var index = 0;
-            var reRender = false;
+            var changed = true;
+
             ConsoleKeyInfo? key = null;
             AnsiConsole.Clear();
 
             while (true)
             {
                 var toRender = _choices.Where(x => Comparer(x, input)).Select(Converter).Take(PageSize).ToArray();
+                key = AnsiConsole.Console.Input.ReadKey(true);
 
-                if (key == null || reRender == true || (key.Value.Key != ConsoleKey.DownArrow &&
-                                                        key.Value.Key != ConsoleKey.UpArrow &&
-                                                        key.Value.Key != ConsoleKey.Backspace &&
-                                                        key.Value.Key != ConsoleKey.Enter))
+                if(changed == true)
                 {
-                    reRender = false;
+                    AnsiConsole.Clear();
                     var newText = new Text($"Searching for: {input}");
                     AnsiConsole.Render(newText);
                     AnsiConsole.Render(Text.NewLine);
                     var list = new ListRenderable(toRender, index);
                     AnsiConsole.Render(list);
+                    changed = false;
                 }
 
-                key = AnsiConsole.Console.Input.ReadKey(true);
-
-                if (key.Value.Key == ConsoleKey.Backspace && input.Length > 0)
+                if (key is not null)
                 {
-                    index = 0;
-                    input = input.Substring(0, input.Length - 1);
-                    reRender = true;
-                    AnsiConsole.Clear();
-                    continue;
-                }
 
-                if (key.Value.Key == ConsoleKey.DownArrow && index < toRender.Length - 1)
-                {
-                    index += 1;
-                    AnsiConsole.Render(new ClearRowRederable(index, toRender.Length + 1));
-                    AnsiConsole.Render(new Text(toRender.ElementAt(index - 1)));
-                    AnsiConsole.Render(new ClearRowRederable(index + 1, toRender.Length + 1));
-                    AnsiConsole.Render(new SelectedItemRenderable(toRender.ElementAt(index)));
-                    continue;
-                }
-
-                if (key.Value.Key == ConsoleKey.UpArrow && index > 0)
-                {
-                    index -= 1;
-                    AnsiConsole.Render(new ClearRowRederable(index + 2, toRender.Length + 1));
-                    AnsiConsole.Render(new Text(toRender.ElementAt(index + 1)));
-                    AnsiConsole.Render(new ClearRowRederable(index + 1, toRender.Length + 1));
-                    AnsiConsole.Render(new SelectedItemRenderable(toRender.ElementAt(index)));
-                    continue;
-                }
-
-                if (key.Value.Key == ConsoleKey.Enter)
-                {
-                    if (toRender.Length == 0)
+                    if (key.Value.Key == ConsoleKey.Backspace && input.Length > 0)
                     {
+                        index = 0;
+                        input = input.Substring(0, input.Length - 1);
+                        changed = true;
                         continue;
                     }
 
-                    break;
-                }
+                    if (key.Value.Key == ConsoleKey.DownArrow && index < toRender.Length - 1)
+                    {
+                        index += 1;
+                        AnsiConsole.Render(new ClearRowRederable(index, toRender.Length + 1));
+                        AnsiConsole.Render(new Text(toRender.ElementAt(index - 1)));
+                        AnsiConsole.Render(new ClearRowRederable(index + 1, toRender.Length + 1));
+                        AnsiConsole.Render(new SelectedItemRenderable(toRender.ElementAt(index)));
+                        continue;
+                    }
 
-                if (char.IsLetterOrDigit(key.Value.KeyChar)
-                    || char.IsWhiteSpace(key.Value.KeyChar)
-                    || char.IsSymbol(key.Value.KeyChar)
-                    || char.IsPunctuation(key.Value.KeyChar))
-                {
-                    index = 0;
-                    input += key.Value.KeyChar;
-                    AnsiConsole.Clear();
-                    continue;
+                    if (key.Value.Key == ConsoleKey.UpArrow && index > 0)
+                    {
+                        index -= 1;
+                        AnsiConsole.Render(new ClearRowRederable(index + 2, toRender.Length + 1));
+                        AnsiConsole.Render(new Text(toRender.ElementAt(index + 1)));
+                        AnsiConsole.Render(new ClearRowRederable(index + 1, toRender.Length + 1));
+                        AnsiConsole.Render(new SelectedItemRenderable(toRender.ElementAt(index)));
+                        continue;
+                    }
+
+                    if (key.Value.Key == ConsoleKey.Enter)
+                    {
+                        if (toRender.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        break;
+                    }
+
+                    if (char.IsLetterOrDigit(key.Value.KeyChar)
+                        || char.IsWhiteSpace(key.Value.KeyChar)
+                        || char.IsSymbol(key.Value.KeyChar)
+                        || char.IsPunctuation(key.Value.KeyChar))
+                    {
+                        index = 0;
+                        input += key.Value.KeyChar;
+                        changed = true;
+                        continue;
+                    }
                 }
             }
 
@@ -110,7 +112,7 @@ namespace Spectre.Console
             throw new NotImplementedException();
         }
     }
-    
+
     internal class ClearRowRederable : IRenderable
     {
         private readonly int _row;
